@@ -1,0 +1,8 @@
+flask
+jinja2
+gunicorn
+flask-login
+flask-sqlalchemy
+psycopg2-binary
+requests
+pytz

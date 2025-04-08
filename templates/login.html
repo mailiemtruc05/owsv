@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Đăng nhập quản trị</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f4f4f4;
+        padding: 20px;
+        text-align: center;
+      }
+      form {
+        background: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        display: inline-block;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      }
+      input {
+        padding: 10px;
+        margin: 10px;
+        width: 200px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      button {
+        background: #4caf50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+      button:hover {
+        background: #367c39;
+      }
+      .flash {
+        color: red;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Đăng nhập trang quản trị</h1>
+
+    <!-- Flash message thông báo lỗi -->
+    {% with messages = get_flashed_messages() %} {% if messages %}
+    <div class="flash">{{ messages[0] }}</div>
+    {% endif %} {% endwith %}
+
+    <form method="POST" action="/login">
+      <input type="text" name="username" placeholder="Tên đăng nhập" required />
+      <br />
+      <input type="password" name="password" placeholder="Mật khẩu" required />
+      <br />
+      <button type="submit">🔒 Đăng nhập</button>
+    </form>
+  </body>
+</html>
