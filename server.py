@@ -12,14 +12,14 @@ app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 
 # Cấu hình PostgreSQL trên Render
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://owuser:UHOVq7BWTYMIJmxC4nqGKidby1xyIlY9@dpg-cvq9rneuk2gs73d0icd0-a/ow_cf3t"
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://owuser:WpZZK72KQZL7LPXBkt8mTp8BnU4XH7Ba@dpg-d04a0v95pdvs73c63gdg-a/ow_fxd8"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Import Database & Models
 from database import db
-db.init_app(app)
-
 from models import AllowedMachine, PendingMachine
+
+db.init_app(app)
 
 # Tạo database nếu chưa có
 with app.app_context():
@@ -27,10 +27,9 @@ with app.app_context():
 
 # Đăng ký tài khoản admin mặc định
 USERNAME = "admin"
-PASSWORD = "0934828105t"
+PASSWORD = "0934828105Trcdz@#"
 
 # Cấu hình Flask-Login
-
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
@@ -44,12 +43,6 @@ def load_user(user_id):
     if user_id == USERNAME:
         return User(user_id)
     return None
-
-# ------------------- MODELS -------------------
-
-from models import AllowedMachine, PendingMachine
-
-# ------------------- TRANG ĐĂNG NHẬP -------------------
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -66,19 +59,15 @@ def login():
             flash("⛔ Sai tài khoản hoặc mật khẩu!")
     return render_template('login.html')
 
-
 @app.route('/logout')
 def logout():
     logout_user()
     flash("👋 Đã đăng xuất!")
     return redirect(url_for('login'))
 
-# ------------------- TRANG ADMIN -------------------
-
 @app.route('/admin')
 @login_required
 def admin():
-
     vietnam_tz = pytz.timezone("Asia/Ho_Chi_Minh")
     now = datetime.now(vietnam_tz).replace(second=0, microsecond=0)
 
@@ -98,7 +87,6 @@ def admin():
 
         expiry = expiry.replace(second=0, microsecond=0)
 
-        # Gán timezone nếu chưa có
         if expiry.tzinfo is None:
             expiry = vietnam_tz.localize(expiry)
 
@@ -119,41 +107,52 @@ def admin():
         pending_machines=pending_machines
     )
 
-
-# ------------------- TRANG CHÍNH -------------------
-
 @app.route('/')
 def home():
     return "✅ Server is running!"
 
-# ------------------- THÊM MÁY MỚI -------------------
-
 @app.route('/add_machine', methods=['POST'])
 def add_machine():
     hostname = request.form.get('hostname')
-    mac = request.form.get('mac')
+    uuid = request.form.get('uuid')
+    tool_name = request.form.get('tool_name')
+    expiry_date_str = request.form.get('expiry_date')
+    discord_name = request.form.get('discord_name')
 
-    if not hostname or not mac:
+    try:
+        expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%dT%H:%M")
+    except:
+        flash("⛔ Lỗi định dạng thời gian!")
+        return redirect(url_for('admin'))
+
+    if not hostname or not uuid or not tool_name:
         flash("⛔ Vui lòng điền đầy đủ thông tin!")
         return redirect(url_for('admin'))
 
-    if AllowedMachine.query.filter_by(mac=mac).first():
+    # Kiểm tra máy đã có với uuid nhưng tên tool khác
+    existing_machine = AllowedMachine.query.filter_by(uuid=uuid).first()
+    if existing_machine and existing_machine.tool_name == tool_name:
         flash("⚠️ Máy này đã có trong danh sách hợp lệ!")
+        return redirect(url_for('admin'))
+
+    # Kiểm tra máy trong PendingMachine với cùng uuid và tool_name
+    existing_pending_machine = PendingMachine.query.filter_by(uuid=uuid).first()
+    if existing_pending_machine:
+        flash("⚠️ Máy này đang chờ duyệt!")
         return redirect(url_for('admin'))
 
     new_machine = AllowedMachine(
         hostname=hostname,
-        mac=mac,
-        tool_name="Default",  # hoặc thay đổi theo cách bạn xử lý tool_name mặc định
-        expiry_date=datetime(2025, 12, 31, 23, 59)
+        uuid=uuid,
+        tool_name=tool_name,
+        expiry_date=expiry_date,
+        discord_name=discord_name
     )
 
     db.session.add(new_machine)
     db.session.commit()
     flash("✅ Thêm máy thành công!")
     return redirect(url_for('admin'))
-
-# ------------------- API MÁY HỢP LỆ -------------------
 
 @app.route('/allowed_machines', methods=['GET'])
 def get_allowed_machines():
@@ -169,86 +168,93 @@ def get_allowed_machines():
     ).all()
 
     return jsonify([
-        {'hostname': m.hostname, 'mac': m.mac, 'tool_name': m.tool_name, 'expiry_date': m.expiry_date}
+        {'hostname': m.hostname, 'uuid': m.uuid, 'tool_name': m.tool_name, 'expiry_date': m.expiry_date, 'discord_name': m.discord_name}
         for m in valid_machines
     ])
 
-
-
-@app.route('/delete_machine/<mac>/<tool_name>')
-def delete_machine(mac, tool_name):
-    machine = AllowedMachine.query.filter_by(mac=mac, tool_name=tool_name).first()
+@app.route('/delete_machine/<uuid>/<tool_name>')
+def delete_machine(uuid, tool_name):
+    machine = AllowedMachine.query.filter_by(uuid=uuid, tool_name=tool_name).first()
     if machine:
         db.session.delete(machine)
         db.session.commit()
         flash("❌ Đã xóa máy khỏi danh sách hợp lệ!")
     return redirect(url_for('admin'))
 
-@app.route('/edit_expiry/<mac>/<tool_name>', methods=['POST'])
-def edit_expiry(mac, tool_name):
+@app.route('/edit_expiry/<uuid>/<tool_name>', methods=['POST'])
+def edit_expiry(uuid, tool_name):
     new_expiry_date_str = request.form.get('new_expiry_date')
+    discord_name = request.form.get('discord_name')
     try:
         new_expiry_date = datetime.strptime(new_expiry_date_str, "%Y-%m-%dT%H:%M")
-        new_expiry_date = new_expiry_date.replace(second=0, microsecond=0)  # ✅ chuẩn hóa
+        new_expiry_date = new_expiry_date.replace(second=0, microsecond=0)
     except ValueError:
         flash("⛔ Lỗi định dạng thời gian.")
         return redirect(url_for('admin'))
 
-    machine = AllowedMachine.query.filter_by(mac=mac, tool_name=tool_name).first()
+    machine = AllowedMachine.query.filter_by(uuid=uuid, tool_name=tool_name).first()
     if machine:
         machine.expiry_date = new_expiry_date
+        machine.discord_name = discord_name
         db.session.commit()
-        flash("✅ Cập nhật ngày hết hạn thành công!")
+        flash("✅ Cập nhật thành công!")
 
     return redirect(url_for('admin'))
 
-
-# ------------------- XỬ LÝ MÁY CHỜ DUYỆT -------------------
+@app.route('/set_permanent/<uuid>/<tool_name>')
+def set_permanent(uuid, tool_name):
+    machine = AllowedMachine.query.filter_by(uuid=uuid, tool_name=tool_name).first()
+    if machine:
+        machine.expiry_date = datetime(2099, 12, 31, 23, 59)
+        db.session.commit()
+        flash("✅ Đã thiết lập máy dùng vĩnh viễn!")
+    return redirect(url_for('admin'))
 
 @app.route('/pending_machines', methods=['GET'])
 def get_pending_machines():
     pending_machines = PendingMachine.query.all()
-    return jsonify([{'id': m.id, 'hostname': m.hostname, 'mac': m.mac} for m in pending_machines])
+    return jsonify([{'id': m.id, 'hostname': m.hostname, 'uuid': m.uuid} for m in pending_machines])
 
 @app.route('/register_machine', methods=['POST'])
 def register_machine():
     data = request.get_json()
     hostname = data.get('hostname')
-    mac = data.get('mac')
-    tool_name = data.get('tool_name')  # 👈 lấy thêm tool_name
+    uuid = data.get('uuid')
+    tool_name = data.get('tool_name')
 
-    if hostname and mac and tool_name:
-        if AllowedMachine.query.filter_by(mac=mac, tool_name=tool_name).first() or \
-           PendingMachine.query.filter_by(mac=mac, tool_name=tool_name).first():
+    if hostname and uuid and tool_name:
+        if AllowedMachine.query.filter_by(uuid=uuid, tool_name=tool_name).first() or \
+           PendingMachine.query.filter_by(uuid=uuid, tool_name=tool_name).first():
             return jsonify({"status": "duplicate"}), 409
 
-        new_machine = PendingMachine(hostname=hostname, mac=mac, tool_name=tool_name)
+        new_machine = PendingMachine(hostname=hostname, uuid=uuid, tool_name=tool_name)
         db.session.add(new_machine)
         db.session.commit()
         return jsonify({"status": "pending"}), 200
 
     return jsonify({"status": "failed"}), 400
 
-
-@app.route('/approve_machine/<mac>/<tool_name>', methods=['POST'])
-def approve_machine(mac, tool_name):
+@app.route('/approve_machine/<uuid>/<tool_name>', methods=['POST'])
+def approve_machine(uuid, tool_name):
     expiry_date_str = request.form.get('expiry_date')
+    discord_name = request.form.get('discord_name')  # Lấy discord_name từ form
+    
     try:
         expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%dT%H:%M")
-        # Chuẩn hóa (cắt giây và microsecond) để so sánh chính xác sau này
         expiry_date = expiry_date.replace(second=0, microsecond=0)
     except ValueError:
         flash("⛔ Lỗi định dạng thời gian.")
         return redirect(url_for('admin'))
 
-    machine = PendingMachine.query.filter_by(mac=mac, tool_name=tool_name).first()
+    machine = PendingMachine.query.filter_by(uuid=uuid, tool_name=tool_name).first()
 
     if machine:
         new_allowed_machine = AllowedMachine(
             hostname=machine.hostname,
-            mac=machine.mac,
+            uuid=machine.uuid,
             tool_name=machine.tool_name,
-            expiry_date=expiry_date
+            expiry_date=expiry_date,
+            discord_name=discord_name  # Gán discord_name từ form
         )
         db.session.add(new_allowed_machine)
         db.session.delete(machine)
@@ -259,33 +265,21 @@ def approve_machine(mac, tool_name):
 
     return redirect(url_for('admin'))
 
-
-
-
-@app.route('/delete_pending/<mac>/<tool_name>')
-def delete_pending(mac, tool_name):
-    machine = PendingMachine.query.filter_by(mac=mac, tool_name=tool_name).first()
+@app.route('/delete_pending/<uuid>/<tool_name>')
+def delete_pending(uuid, tool_name):
+    machine = PendingMachine.query.filter_by(uuid=uuid, tool_name=tool_name).first()
     if machine:
         db.session.delete(machine)
         db.session.commit()
         flash("❌ Đã xóa máy khỏi danh sách chờ!")
     return redirect(url_for('admin'))
 
-@app.route('/set_permanent/<mac>/<tool_name>')
-def set_permanent(mac, tool_name):
-    machine = AllowedMachine.query.filter_by(mac=mac, tool_name=tool_name).first()
-    if machine:
-        machine.expiry_date = datetime(2099, 12, 31, 23, 59)
-        db.session.commit()
-        flash("✅ Đã thiết lập máy dùng vĩnh viễn!")
-    return redirect(url_for('admin'))
-
-def is_machine_allowed(mac, tool_name):
+def is_machine_allowed(uuid, tool_name):
     url = f"https://your-domain/allowed_machines?tool_name={tool_name}"
     response = requests.get(url)
     if response.status_code == 200:
         machines = response.json()
-        return any(m['mac'] == mac for m in machines)
+        return any(m['uuid'] == uuid for m in machines)
     return False
 
 if __name__ == "__main__":

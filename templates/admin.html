@@ -79,15 +79,15 @@
       }
 
       .status-ok {
-        background-color: #4caf50; /* Xanh lá */
+        background-color: #4caf50;
       }
 
       .status-expired {
-        background-color: #f44336; /* Đỏ */
+        background-color: #f44336;
       }
 
       .status-permanent {
-        background-color: #2196f3; /* Xanh nước biển */
+        background-color: #2196f3;
       }
     </style>
   </head>
@@ -95,36 +95,33 @@
   <body>
     <h1>Quản lý danh sách máy hợp lệ</h1>
 
-    <!-- Thông báo flash -->
-    {% with messages = get_flashed_messages() %} {% if messages %}
+    {% with messages = get_flashed_messages() %} 
+    {% if messages %}
     <div class="flash">{{ messages[0] }}</div>
-    {% endif %} {% endwith %}
+    {% endif %}
+    {% endwith %}
 
-    <!-- ========================= DANH SÁCH MÁY CHỜ DUYỆT ========================= -->
     <h2>Danh sách máy chờ duyệt</h2>
     <table>
       <tr>
+        <th>Discord Name</th>
         <th>Hostname</th>
-        <th>MAC Address</th>
+        <th>UUID</th>
         <th>Tên Tool</th>
         <th>Hết hạn</th>
         <th>Hành động</th>
       </tr>
       {% for machine in pending_machines %}
       <tr>
-        <form
-          action="/approve_machine/{{ machine.mac }}/{{ machine.tool_name }}"
-          method="post"
-        >
+        <form action="/approve_machine/{{ machine.uuid }}/{{ machine.tool_name }}" method="post">
+          <td><input type="text" name="discord_name" placeholder="Discord Name" value="{{ machine.discord_name or '' }}"></td>
           <td>{{ machine.hostname }}</td>
-          <td>{{ machine.mac }}</td>
+          <td>{{ machine.uuid }}</td>
           <td>{{ machine.tool_name }}</td>
-          <td>
-            <input type="datetime-local" name="expiry_date" required />
-          </td>
+          <td><input type="datetime-local" name="expiry_date" required /></td>
           <td>
             <button type="submit">✔️ Duyệt</button>
-            <a href="/delete_pending/{{ machine.mac }}/{{ machine.tool_name }}">
+            <a href="/delete_pending/{{ machine.uuid }}/{{ machine.tool_name }}">
               <button class="delete-btn" type="button">❌ Xóa</button>
             </a>
           </td>
@@ -133,12 +130,12 @@
       {% endfor %}
     </table>
 
-    <!-- ========================= DANH SÁCH MÁY HỢP LỆ ========================= -->
     <h2>Danh sách máy hợp lệ</h2>
     <table>
       <tr>
+        <th>Discord Name</th>
         <th>Hostname</th>
-        <th>MAC Address</th>
+        <th>UUID</th>
         <th>Tên Tool</th>
         <th>Ngày hết hạn</th>
         <th>Trạng thái</th>
@@ -146,61 +143,42 @@
       </tr>
       {% for machine in allowed_machines %}
       <tr>
+        <td>{{ machine.discord_name or '' }}</td>
         <td>{{ machine.hostname }}</td>
-        <td>{{ machine.mac }}</td>
+        <td>{{ machine.uuid }}</td>
         <td>{{ machine.tool_name }}</td>
         <td>
-          <form
-            action="{{ url_for('edit_expiry', mac=machine.mac, tool_name=machine.tool_name) }}"
-            method="post"
-          >
-            <input
-              type="datetime-local"
-              name="new_expiry_date"
-              value="{{ machine.expiry_date.strftime('%Y-%m-%dT%H:%M') }}"
-              required
-              step="1"
-            />
+          <form action="{{ url_for('edit_expiry', uuid=machine.uuid, tool_name=machine.tool_name) }}" method="post">
+            <input type="datetime-local" name="new_expiry_date" value="{{ machine.expiry_date.strftime('%Y-%m-%dT%H:%M') }}" required step="1" />
+            <input type="text" name="discord_name" value="{{ machine.discord_name or '' }}" placeholder="Discord Name">
             <button type="submit">💾 Lưu</button>
           </form>
         </td>
         <td>
-          <span
-            class="status-badge {% if machine.status == 'Còn hạn' %} status-ok {% elif machine.status == 'Hết hạn' %} status-expired {% elif machine.status == 'Vĩnh viễn' %} status-permanent {% endif %}"
-          >
+          <span class="status-badge {% if machine.status == 'Còn hạn' %} status-ok {% elif machine.status == 'Hết hạn' %} status-expired {% elif machine.status == 'Vĩnh viễn' %} status-permanent {% endif %}">
             {{ machine.status }}
           </span>
         </td>
         <td>
-          <a
-            href="{{ url_for('delete_machine', mac=machine.mac, tool_name=machine.tool_name) }}"
-            >❌ Xóa</a
-          >
+          <a href="{{ url_for('delete_machine', uuid=machine.uuid, tool_name=machine.tool_name) }}">❌ Xóa</a>
           |
-          <a
-            href="{{ url_for('set_permanent', mac=machine.mac, tool_name=machine.tool_name) }}"
-            >⭐ Vĩnh viễn</a
-          >
+          <a href="{{ url_for('set_permanent', uuid=machine.uuid, tool_name=machine.tool_name) }}">⭐ Vĩnh viễn</a>
         </td>
       </tr>
       {% endfor %}
     </table>
 
-    <!-- ========================= FORM THÊM MÁY THỦ CÔNG ========================= -->
     <h2>Thêm máy mới (thủ công)</h2>
     <form action="/add_machine" method="post">
+      <input type="text" name="discord_name" placeholder="Discord Name (tùy chọn)" />
       <input type="text" name="hostname" placeholder="Hostname" required />
-      <input type="text" name="mac" placeholder="MAC Address" required />
+      <input type="text" name="uuid" placeholder="UUID" required />
       <input type="text" name="tool_name" placeholder="Tên Tool" required />
       <input type="datetime-local" name="expiry_date" required />
       <button type="submit">Thêm máy</button>
     </form>
 
-    <!-- Đăng xuất -->
-    <a
-      href="/logout"
-      style="float: right; margin-top: -40px; color: red; font-weight: bold"
-    >
+    <a href="/logout" style="float: right; margin-top: -40px; color: red; font-weight: bold">
       👋 Đăng xuất
     </a>
   </body>
