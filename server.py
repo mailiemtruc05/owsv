@@ -6,13 +6,21 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import pytz
 import requests
+from dotenv import load_dotenv
+import secrets
+
+# Load biến môi trường từ .env
+load_dotenv()
+
+# Tạo một chuỗi bí mật ngẫu nhiên với độ dài 64 ký tự
+secret_key = secrets.token_hex(32)  # Chuỗi hex dài 64 ký tự
 
 # Khởi tạo Flask App
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'
+app.secret_key = secret_key  # Gán chuỗi bí mật cho ứng dụng Flask
 
-# Cấu hình PostgreSQL trên Render
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://owuser:WpZZK72KQZL7LPXBkt8mTp8BnU4XH7Ba@dpg-d04a0v95pdvs73c63gdg-a/ow_fxd8"
+# Cấu hình PostgreSQL từ biến môi trường
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Import Database & Models
